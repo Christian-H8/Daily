@@ -9,13 +9,23 @@ val EPOCH: LocalDate = LocalDate.of(2026, 1, 1)
 
 object DailySelector {
 
-    /** The entry for [date], or null if the corpus is empty. Pure: no clock, no I/O. */
+    /**
+     * The one fixed permutation. Freshness comes from the corpus growing, not from
+     * reshuffling — see DECISIONS D-007 for why the reshuffle was dropped.
+     *
+     * Exposed so callers that need many days at once (the timeline) sort once
+     * instead of once per day.
+     */
+    fun orderOf(corpus: List<Entry>): List<Entry> =
+        corpus.sortedWith(compareBy({ StableHash.of(it.id) }, { it.id }))
+
+    /** Position in [orderOf] for [date]. Pure: no clock, no I/O, no corpus. */
+    fun indexFor(date: LocalDate, size: Int, epoch: LocalDate = EPOCH): Int =
+        Math.floorMod(ChronoUnit.DAYS.between(epoch, date).toInt(), size)
+
+    /** The entry for [date], or null if the corpus is empty. */
     fun entryFor(date: LocalDate, corpus: List<Entry>, epoch: LocalDate = EPOCH): Entry? {
         if (corpus.isEmpty()) return null
-        val dayIndex = ChronoUnit.DAYS.between(epoch, date).toInt()
-        return corpus
-            .sortedWith(compareBy({ StableHash.of(it.id) }, { it.id }))[
-            Math.floorMod(dayIndex, corpus.size)
-        ]
+        return orderOf(corpus)[indexFor(date, corpus.size, epoch)]
     }
 }

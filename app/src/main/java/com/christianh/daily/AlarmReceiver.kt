@@ -53,9 +53,9 @@ class AlarmReceiver : BroadcastReceiver() {
 }
 
 /**
- * The notification is the invitation, not the entry. Lead with the hook — the
- * quote if the entry has one, otherwise its opening — then the reading time, so
- * "do I have time for this?" is answered on the lock screen.
+ * The notification is the invitation, not the entry — the hook and nothing else.
+ * No reading time: a duration invites triage, and the point is to sit with the
+ * thing, not to decide whether it fits in a gap.
  */
 private fun bigTextFor(entry: Entry): String {
     val blocks = entry.sections.flatMap { it.blocks }
@@ -63,9 +63,7 @@ private fun bigTextFor(entry: Entry): String {
         q.text + (q.attribution?.let { "\n— $it" } ?: "")
     } ?: blocks.filterIsInstance<Block.Paragraph>().firstOrNull()?.text.orEmpty()
 
-    return buildString {
-        if (entry.tagline.isNotBlank()) append(entry.tagline).append("\n\n")
-        if (hook.isNotBlank()) append(hook).append("\n\n")
-        append("${entry.minutes} min read")
-    }
+    return listOf(entry.tagline, hook)
+        .filter { it.isNotBlank() }
+        .joinToString("\n\n")
 }
