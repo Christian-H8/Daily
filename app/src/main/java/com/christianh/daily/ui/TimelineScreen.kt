@@ -65,7 +65,8 @@ private fun rowsFor(days: List<Day>): List<RowItem> {
 fun TimelineScreen(
     corpus: List<Entry>,
     today: LocalDate,
-    onOpen: (Entry) -> Unit
+    notes: Map<LocalDate, String>,
+    onOpen: (Day) -> Unit
 ) {
     var tag by remember { mutableStateOf<String?>(null) }
 
@@ -82,7 +83,7 @@ fun TimelineScreen(
             items(rows) { row ->
                 when (row) {
                     is RowItem.MonthHeader -> MonthHeaderView(row.label)
-                    is RowItem.DayRow -> DayRowView(row.day, onOpen)
+                    is RowItem.DayRow -> DayRowView(row.day, notes[row.day.date], onOpen)
                 }
             }
         }
@@ -124,12 +125,17 @@ private fun MonthHeaderView(label: String) {
     Spacer(Modifier.height(8.dp))
 }
 
+/**
+ * One day. The note sits under the entry it was written against — the pairing is
+ * the whole point of the timeline (D-016), and a day with a note is also the only
+ * day pinned against drift ([R5.8]).
+ */
 @Composable
-private fun DayRowView(day: Day, onOpen: (Entry) -> Unit) {
+private fun DayRowView(day: Day, note: String?, onOpen: (Day) -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
-            .clickable { onOpen(day.entry) }
+            .clickable { onOpen(day) }
             .padding(horizontal = 24.dp, vertical = 12.dp)
     ) {
         Text(
@@ -151,6 +157,10 @@ private fun DayRowView(day: Day, onOpen: (Entry) -> Unit) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     lineHeight = 16.sp
                 )
+            }
+            if (!note.isNullOrBlank()) {
+                Spacer(Modifier.height(8.dp))
+                NotePreview(note)
             }
         }
     }

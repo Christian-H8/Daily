@@ -12,6 +12,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,7 +22,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -44,36 +44,50 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.christianh.daily.Domain.DailySelector
+import com.christianh.daily.Domain.Day
+import com.christianh.daily.Domain.model.AmbientState
 import com.christianh.daily.Domain.model.Entry
+import com.christianh.daily.Domain.model.partOfDay
 import com.christianh.daily.data.CorpusLoader
 import com.christianh.daily.data.CorpusSource
-import com.christianh.daily.data.LoadedCorpus
+import com.christianh.daily.data.ForecastSource
+import com.christianh.daily.data.NoteRepository
+import com.christianh.daily.data.Prefs
 import com.christianh.daily.ui.DialBand
 import com.christianh.daily.ui.EntryView
+import com.christianh.daily.ui.HomeScreen
+import com.christianh.daily.ui.NoteEditor
+import com.christianh.daily.ui.SettingsScreen
 import com.christianh.daily.ui.TimelineScreen
 import com.christianh.daily.ui.theme.DailyTheme
 import java.time.LocalDate
+import java.time.LocalTime
 
 private sealed interface Screen {
+    data object Home : Screen
     data object Today : Screen
     data object Timeline : Screen
-    data class Reader(val entry: Entry) : Screen
+    data object Settings : Screen
+    data class Reader(val day: Day) : Screen
 }
 
 /**
- * The sections that sit on the dial's arc, in order. Reader is not one of them —
- * it is reached from the timeline and keeps the hand where it was.
- * Home and Settings extend this list, which is all it takes to subdivide the arc.
+ * The sections on the dial's arc, in order. `Reader` is not one of them — it is
+ * reached from the timeline and keeps the hand where it was.
+ *
+ * Adding a section is an entry here and a branch in the `when`. The arc subdivides
+ * itself: four sections sit at 0, ⅓, ⅔ and 1 across the visible half.
  */
-private val SECTIONS = listOf(Screen.Today, Screen.Timeline)
+private val SECTIONS = listOf(Screen.Home, Screen.Today, Screen.Timeline, Screen.Settings)
 
 private fun Screen.sectionIndex(): Int = when (this) {
-    Screen.Today -> 0
-    Screen.Timeline -> 1
-    is Screen.Reader -> 1
+    Screen.Home -> 0
+    Screen.Today -> 1
+    Screen.Timeline -> 2
+    Screen.Settings -> 3
+    is Screen.Reader -> 2
 }
 
-/** Index -> position across the visible half. One section would sit at the left. */
 private fun Int.asFraction(): Float =
     if (SECTIONS.size <= 1) 0f else this.toFloat() / (SECTIONS.size - 1).toFloat()
 
@@ -97,9 +111,16 @@ class MainActivity : ComponentActivity() {
         setContent {
             DailyTheme {
                 Surface(Modifier.fillMaxSize()) {
-                    var corpus by remember { mutableStateOf(CorpusLoader.load(this)) }
-                    var folder by remember { mutableStateOf(CorpusSource.treeLabel(this)) }
+                    val ctx = this@MainActivity
+                    val today = LocalDate.now()
+
+                    var corpus by remember { mutableStateOf(CorpusLoader.load(ctx)) }
+                    var folder by remember { mutableStateOf(CorpusSource.treeLabel(ctx)) }
                     var screen by remember { mutableStateOf<Screen>(Screen.Today) }
+                    var notes by remember { mutableStateOf(NoteRepository.all(ctx)) }
+                    var hour by remember { mutableStateOf(Prefs.hour(ctx)) }
+                    var minute by remember { mutableStateOf(Prefs.minute(ctx)) }
+                    var override by remember { mutableStateOf(Prefs.forecastOverride(ctx)) }
 
                     val todayScroll = rememberScrollState()
                     val readerScroll = rememberScrollState()
@@ -108,9 +129,9 @@ class MainActivity : ComponentActivity() {
                         ActivityResultContracts.OpenDocumentTree()
                     ) { uri ->
                         if (uri != null) {
-                            CorpusSource.saveTree(this, uri)
-                            folder = CorpusSource.treeLabel(this)
-                            corpus = CorpusLoader.load(this)
+                            CorpusSource.saveTree(ctx, uri)
+                            folder = CorpusSource.treeLabel(ctx)
+                            corpus = CorpusLoader.load(ctx)
                         }
                     }
 
@@ -118,25 +139,32 @@ class MainActivity : ComponentActivity() {
                         screen = if (screen is Screen.Reader) Screen.Timeline else Screen.Today
                     }
 
-                    // The dial gets out of the way the moment you start reading, and
-                    // comes back when you return to the top. No timer: scrolling is
-                    // the signal, and it is the one that actually means "reading".
+                    // The dial retreats the moment reading starts, and returns at the
+                    // top. Scroll is the signal, not a timer — a timer would hide it
+                    // while you sit still thinking, which is the opposite of the point.
                     val reading = when (screen) {
                         Screen.Today -> todayScroll.value > 48
                         is Screen.Reader -> readerScroll.value > 48
-                        Screen.Timeline -> false
+                        else -> false
                     }
                     val dialHeight by animateDpAsState(
-                        targetValue = if (reading) 0.dp else 132.dp,
+                        targetValue = if (reading) 0.dp else 150.dp,
                         animationSpec = tween(durationMillis = 320),
                         label = "dial-height"
                     )
 
-                    val today = LocalDate.now()
                     val cycle = remember(corpus.entries.size, today) {
                         val n = corpus.entries.size
                         if (n <= 1) 0f
                         else DailySelector.indexFor(today, n).toFloat() / (n - 1).toFloat()
+                    }
+
+                    val ambient = remember(override, today, folder) {
+                        AmbientState(
+                            partOfDay = partOfDay(LocalTime.now()),
+                            condition = override
+                                ?: ForecastSource.today(ctx, today)?.condition
+                        )
                     }
 
                     // Swipe drives the gears live; releasing settles to a section.
@@ -153,7 +181,6 @@ class MainActivity : ComponentActivity() {
                     )
                     val span = (SECTIONS.size - 1).coerceAtLeast(1)
                     val live = (settled - drag / screenWidthPx / span).coerceIn(0f, 1f)
-
                     val swipeable = screen !is Screen.Reader
 
                     Box(
@@ -185,24 +212,63 @@ class MainActivity : ComponentActivity() {
 
                             Column(Modifier.weight(1f)) {
                                 when (val s = screen) {
-                                    Screen.Today -> TodayScreen(
-                                        entry = DailySelector.entryFor(today, corpus.entries),
-                                        corpus = corpus,
-                                        folder = folder,
-                                        scroll = todayScroll,
-                                        bottomInset = dialHeight,
-                                        onPickFolder = { pickFolder.launch(null) },
-                                        onReload = { corpus = CorpusLoader.load(this@MainActivity) }
-                                    )
+                                    Screen.Home -> HomeScreen(ambient, today)
+
+                                    Screen.Today -> {
+                                        val entry = DailySelector.entryFor(today, corpus.entries)
+                                        TodayScreen(
+                                            entry = entry,
+                                            date = today,
+                                            note = notes[today]?.text.orEmpty(),
+                                            scroll = todayScroll,
+                                            bottomInset = dialHeight,
+                                            onNote = { text ->
+                                                NoteRepository.put(
+                                                    ctx, today, entry?.id.orEmpty(), text
+                                                )
+                                                notes = NoteRepository.all(ctx)
+                                            }
+                                        )
+                                    }
 
                                     Screen.Timeline -> TimelineScreen(
                                         corpus = corpus.entries,
                                         today = today,
+                                        notes = notes.mapValues { it.value.text },
                                         onOpen = { screen = Screen.Reader(it) }
                                     )
 
+                                    Screen.Settings -> SettingsScreen(
+                                        hour = hour,
+                                        minute = minute,
+                                        onTime = { h, m ->
+                                            hour = h; minute = m
+                                            Prefs.setTime(ctx, h, m)
+                                            scheduleDailyQuote(ctx)
+                                        },
+                                        forecastOverride = override,
+                                        onForecastOverride = { c ->
+                                            override = c
+                                            Prefs.setForecastOverride(ctx, c)
+                                        },
+                                        corpusLine = "${corpus.entries.size} entries  ·  ${corpus.version}",
+                                        sourceLine = if (corpus.fromSyncedFolder)
+                                            "from ${folder ?: "synced folder"}" else "bundled copy",
+                                        onPickFolder = { pickFolder.launch(null) },
+                                        onReload = { corpus = CorpusLoader.load(ctx) }
+                                    )
+
                                     is Screen.Reader -> ReaderScreen(
-                                        s.entry, readerScroll, dialHeight
+                                        day = s.day,
+                                        note = notes[s.day.date]?.text.orEmpty(),
+                                        scroll = readerScroll,
+                                        bottomInset = dialHeight,
+                                        onNote = { text ->
+                                            NoteRepository.put(
+                                                ctx, s.day.date, s.day.entry.id, text
+                                            )
+                                            notes = NoteRepository.all(ctx)
+                                        }
                                     )
                                 }
                             }
@@ -226,20 +292,35 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 private fun NavBar(screen: Screen, onGo: (Screen) -> Unit) {
-    Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
-        TextButton(onClick = { onGo(Screen.Today) }) {
-            Text("Today", fontWeight = weightFor(screen is Screen.Today))
-        }
-        TextButton(onClick = { onGo(Screen.Timeline) }) {
-            Text("Timeline", fontWeight = weightFor(screen is Screen.Timeline))
-        }
+    Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
+        NavItem("Home", screen is Screen.Home) { onGo(Screen.Home) }
+        NavItem("Today", screen is Screen.Today) { onGo(Screen.Today) }
+        NavItem("Timeline", screen is Screen.Timeline) { onGo(Screen.Timeline) }
+        NavItem("Settings", screen is Screen.Settings) { onGo(Screen.Settings) }
     }
 }
 
-private fun weightFor(active: Boolean) = if (active) FontWeight.Bold else FontWeight.Normal
+@Composable
+private fun NavItem(label: String, active: Boolean, onClick: () -> Unit) {
+    TextButton(onClick = onClick) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
+            color = if (active) MaterialTheme.colorScheme.primary
+            else MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
 
 @Composable
-private fun ReaderScreen(entry: Entry, scroll: ScrollState, bottomInset: Dp) {
+private fun ReaderScreen(
+    day: Day,
+    note: String,
+    scroll: ScrollState,
+    bottomInset: Dp,
+    onNote: (String) -> Unit
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -247,7 +328,9 @@ private fun ReaderScreen(entry: Entry, scroll: ScrollState, bottomInset: Dp) {
             .padding(horizontal = 24.dp)
             .padding(top = 32.dp)
     ) {
-        EntryView(entry)
+        EntryView(day.entry)
+        Spacer(Modifier.height(16.dp))
+        NoteEditor(date = day.date, initial = note, onSave = onNote)
         Spacer(Modifier.height(48.dp + bottomInset))
     }
 }
@@ -255,12 +338,11 @@ private fun ReaderScreen(entry: Entry, scroll: ScrollState, bottomInset: Dp) {
 @Composable
 fun TodayScreen(
     entry: Entry?,
-    corpus: LoadedCorpus,
-    folder: String?,
+    date: LocalDate,
+    note: String,
     scroll: ScrollState,
     bottomInset: Dp,
-    onPickFolder: () -> Unit,
-    onReload: () -> Unit
+    onNote: (String) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -273,38 +355,9 @@ fun TodayScreen(
             Text("No entries yet", style = MaterialTheme.typography.bodyLarge)
         } else {
             EntryView(entry)
+            Spacer(Modifier.height(16.dp))
+            NoteEditor(date = date, initial = note, onSave = onNote)
         }
-        Spacer(Modifier.height(48.dp))
-        CorpusStatus(corpus, folder, onPickFolder, onReload)
-        Spacer(Modifier.height(bottomInset))
-    }
-}
-
-/**
- * Not decoration. Without this there is no way to tell a stale corpus from a
- * current one, and "the phone is showing last week's file" is invisible otherwise.
- */
-@Composable
-private fun CorpusStatus(
-    corpus: LoadedCorpus,
-    folder: String?,
-    onPickFolder: () -> Unit,
-    onReload: () -> Unit
-) {
-    HorizontalDivider()
-    Spacer(Modifier.height(12.dp))
-    Text(
-        "${corpus.entries.size} entries  ·  ${corpus.version}",
-        style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
-    )
-    Text(
-        if (corpus.fromSyncedFolder) "from ${folder ?: "synced folder"}" else "bundled copy",
-        style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
-    )
-    Row {
-        TextButton(onClick = onPickFolder) { Text("Choose folder") }
-        TextButton(onClick = onReload) { Text("Reload") }
+        Spacer(Modifier.height(48.dp + bottomInset))
     }
 }

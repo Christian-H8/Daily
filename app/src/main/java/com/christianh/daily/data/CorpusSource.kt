@@ -44,9 +44,15 @@ object CorpusSource {
         treeUri(context)?.let { Uri.decode(it.lastPathSegment ?: it.toString()) }
 
     /** corpus.json from the chosen folder, or null. Never throws — 8am is not the time. */
-    fun syncedJson(context: Context): String? = runCatching {
+    fun syncedJson(context: Context): String? = siblingJson(context, FILE_NAME)
+
+    /**
+     * Any file in the chosen folder, by name. `forecast.json` rides the same pipe as
+     * the corpus rather than getting a channel of its own (SRS [R9.2b]).
+     */
+    fun siblingJson(context: Context, name: String): String? = runCatching {
         val tree = treeUri(context) ?: return null
-        val doc = findChild(context, tree, FILE_NAME) ?: return null
+        val doc = findChild(context, tree, name) ?: return null
         context.contentResolver.openInputStream(doc)
             ?.bufferedReader()
             ?.use { it.readText() }
