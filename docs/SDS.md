@@ -549,7 +549,7 @@ The one thing hosted anywhere is the APK, as a GitHub Release asset (§8.4). It 
 git tag v1.2.3 → push → .github/workflows/release.yml
     resolve version (tag minus "v"; MAJOR.MINOR.PATCH, minor and patch < 100)
     → decode keystore from secrets   ── secret missing → fail, publish nothing
-    → testReleaseUnitTest assembleRelease   (DAILY_VERSION, DAILY_KEYSTORE_* in env)
+    → testDebugUnitTest assembleRelease   (DAILY_VERSION, DAILY_KEYSTORE_* in env)
     → apksigner verify --print-certs   (logs the certificate SHA-256)
     → daily-v1.2.3.apk + SHA256SUMS.txt → GitHub Release (+ workflow artifact)
 ```
@@ -559,6 +559,8 @@ git tag v1.2.3 → push → .github/workflows/release.yml
 - **`--no-configuration-cache` in CI.** The signing passwords are read at configuration time, and the configuration cache would serialise them to disk.
 - **`versionCode` = MAJOR·10000 + MINOR·100 + PATCH**, computed in the build script from `DAILY_VERSION`, so it can only rise as tags do. Local builds keep 1.0 / 1. Every release tag is ≥ v1.0.0 → 10000, above the soak install's 1.
 - **Manual runs** (`workflow_dispatch`) build and upload an artifact without publishing a Release, which makes a pipeline change testable without a tag.
+- **Unit tests run as `testDebugUnitTest`.** AGP 9 creates unit-test tasks only for the tested build type by default, so `testReleaseUnitTest` does not exist, which the first CI run found. The code under test is identical across variants.
+- **No `setup-android` step, and the runner is pinned to `ubuntu-24.04`.** GitHub's Ubuntu images ship the Android SDK with licences accepted, and AGP fetches the missing platform. The extra action failed on the first run and added nothing. Pinning stops a silent image upgrade (the `ubuntu-latest` label moved to Ubuntu 26 in October 2026) from changing what is preinstalled.
 
 ---
 

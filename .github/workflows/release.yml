@@ -82,12 +82,16 @@ jobs:
 
       # --no-configuration-cache: the signing passwords are read at configuration
       # time, and the configuration cache would serialise them to disk.
+      #
+      # testDebugUnitTest, not testReleaseUnitTest: AGP 9 creates unit-test tasks
+      # only for the tested build type (debug) by default. The sources under test
+      # are identical in both variants; only signing and versioning differ.
       - name: Test and build signed release APK
         env:
           DAILY_KEYSTORE_PASSWORD: ${{ secrets.DAILY_KEYSTORE_PASSWORD }}
           DAILY_KEY_ALIAS: ${{ secrets.DAILY_KEY_ALIAS }}
           DAILY_KEY_PASSWORD: ${{ secrets.DAILY_KEY_PASSWORD }}
-        run: ./gradlew --no-configuration-cache testReleaseUnitTest assembleRelease
+        run: ./gradlew --no-configuration-cache testDebugUnitTest assembleRelease
 
       - name: Verify signature and package
         run: |
