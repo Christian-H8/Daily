@@ -1,5 +1,5 @@
 {
-  "corpusVersion": "c2a98e94a53c",
+  "corpusVersion": "a7dff6bb1883",
   "entries": [
     {
       "id": "a-false-frame-that-lets-you-see",
@@ -422,7 +422,7 @@
         "metaphysics"
       ],
       "related": [],
-      "words": 749,
+      "words": 770,
       "minutes": 4,
       "sections": [
         {
@@ -440,7 +440,8 @@
             "thinkers": [
               "Isaac Newton",
               "John Rawls",
-              "Rutger Bregman"
+              "Rutger Bregman",
+              "Edmund Burke"
             ]
           },
           "blocks": [
@@ -454,8 +455,8 @@
             },
             {
               "kind": "quote",
-              "text": "Every generation inherits a world it did not build, and should leave behind a world it did not fully consume.",
-              "attribution": "Paraphrase of a recurring theme in intergenerational ethics"
+              "text": "As the ends of such a partnership cannot be obtained in many generations, it becomes a partnership not only between those who are living, but between those who are living, those who are dead, and those who are to be born.",
+              "attribution": "Edmund Burke, *Reflections on the Revolution in France* (1790)"
             },
             {
               "kind": "p",
@@ -543,7 +544,7 @@
         "other-minds"
       ],
       "related": [],
-      "words": 681,
+      "words": 660,
       "minutes": 3,
       "sections": [
         {
@@ -572,11 +573,6 @@
             {
               "kind": "p",
               "text": "Donald Hoffman takes this further: he argues that evolution didn't select for accurate perception of reality — it selected for fitness-relevant perception. A creature that sees \"drink this\" and \"don't drink this\" survives better than one that sees the full chemical complexity of the liquid. Our perceptual interface hides truth in the same way a computer's desktop hides the machine code underneath. The icons are useful. They are not the reality."
-            },
-            {
-              "kind": "quote",
-              "text": "Consciousness is not something that happens to us. It is something we do — a kind of controlled and controlling hallucination.",
-              "attribution": "Anil Seth, Being You"
             }
           ]
         },
@@ -959,7 +955,7 @@
         "luck-is-an-obligation-not-an-entitlement",
         "you-are-a-steward-not-an-owner"
       ],
-      "words": 715,
+      "words": 721,
       "minutes": 4,
       "sections": [
         {
@@ -995,8 +991,8 @@
             },
             {
               "kind": "quote",
-              "text": "You are the outcome of everything that came before you, and not one bit of it was up to you.",
-              "attribution": "Robert Sapolsky, Determined (2023)"
+              "text": "We are nothing more or less than the cumulative biological and environmental luck, over which we had no control, that has brought us to any moment.",
+              "attribution": "Robert M. Sapolsky, *Determined: A Science of Life Without Free Will* (2023)"
             },
             {
               "kind": "p",
@@ -2671,7 +2667,7 @@
             {
               "kind": "quote",
               "text": "The mind is divided, like a rider on an elephant, and the rider's job is to serve the elephant.",
-              "attribution": "Jonathan Haidt, The Righteous Mind"
+              "attribution": "Jonathan Haidt, *The Righteous Mind* (2012)"
             },
             {
               "kind": "p",
