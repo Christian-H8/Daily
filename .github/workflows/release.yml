@@ -1,0 +1,122 @@
+# Builds, signs and publishes the release APK.
+#
+#   git tag v1.2.3 && git push origin v1.2.3
+#
+# → unit tests → signed release APK → signature check → GitHub Release with the
+#   APK and SHA256SUMS.txt attached.
+#
+# Run it by hand from the Actions tab (workflow_dispatch) to build and download
+# an APK as a workflow artifact without publishing a Release.
+#
+# Secrets (Settings → Secrets and variables → Actions):
+#   DAILY_KEYSTORE_BASE64    the keystore file, base64-encoded
+#   DAILY_KEYSTORE_PASSWORD
+#   DAILY_KEY_ALIAS
+#   DAILY_KEY_PASSWORD
+# The key must be the one that signed the copy already on the phone; Android
+# will not update an app across a signature change (see app/build.gradle.kts).
+
+name: Release APK
+
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to build, MAJOR.MINOR.PATCH without the v (artifact only, no Release)"
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "push" ]; then v="${GITHUB_REF_NAME#v}"; else v="$INPUT_VERSION"; fi
+          if ! printf '%s' "$v" | grep -Eq '^[0-9]+\.[0-9]{1,2}\.[0-9]{1,2}$'; then
+            echo "::error::Version '$v' is not MAJOR.MINOR.PATCH (minor and patch under 100)"; exit 1
+          fi
+          echo "DAILY_VERSION=$v" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"   # matches gradle/gradle-daemon-jvm.properties
+
+      - uses: android-actions/setup-android@v3
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # gradlew was committed from Windows without the executable bit.
+      - run: chmod +x gradlew
+
+      - name: Decode signing key
+        env:
+          KEYSTORE_B64: ${{ secrets.DAILY_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_B64" ]; then
+            echo "::error::DAILY_KEYSTORE_BASE64 is not set. Refusing to build: an APK signed with a throwaway key could never update an existing install."
+            exit 1
+          fi
+          printf '%s' "$KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/daily.keystore"
+          echo "DAILY_KEYSTORE_FILE=$RUNNER_TEMP/daily.keystore" >> "$GITHUB_ENV"
+
+      # --no-configuration-cache: the signing passwords are read at configuration
+      # time, and the configuration cache would serialise them to disk.
+      - name: Test and build signed release APK
+        env:
+          DAILY_KEYSTORE_PASSWORD: ${{ secrets.DAILY_KEYSTORE_PASSWORD }}
+          DAILY_KEY_ALIAS: ${{ secrets.DAILY_KEY_ALIAS }}
+          DAILY_KEY_PASSWORD: ${{ secrets.DAILY_KEY_PASSWORD }}
+        run: ./gradlew --no-configuration-cache testReleaseUnitTest assembleRelease
+
+      - name: Verify signature and package
+        run: |
+          APK=app/build/outputs/apk/release/app-release.apk
+          BT="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
+          "$BT/apksigner" verify --verbose --print-certs "$APK" | tee "$RUNNER_TEMP/signing.txt"
+          # Compare this fingerprint with the key on your machine before the first
+          # install over an existing copy:
+          #   keytool -list -v -keystore <keystore> | grep SHA256
+          grep -i "SHA-256 digest" "$RUNNER_TEMP/signing.txt" | head -1
+          mkdir -p dist
+          cp "$APK" "dist/daily-v${DAILY_VERSION}.apk"
+          (cd dist && sha256sum ./*.apk | sed 's# \./# #' > SHA256SUMS.txt && cat SHA256SUMS.txt)
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: daily-v${{ env.DAILY_VERSION }}
+          path: dist/
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        if: github.event_name == 'push'
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Daily v${{ env.DAILY_VERSION }}
+          files: |
+            dist/daily-v${{ env.DAILY_VERSION }}.apk
+            dist/SHA256SUMS.txt
+          generate_release_notes: true
+          body: |
+            **Install:** download `daily-v${{ env.DAILY_VERSION }}.apk` on an Android 12+ phone and open it. See the [README](https://github.com/Christian-H8/Daily#install) for battery-optimisation and update notes.
+
+            Updating over an earlier version keeps your notes. If Android reports a package conflict, **don't uninstall** (that deletes notes); open an issue.
+
+      - name: Remove keystore
+        if: always()
+        run: rm -f "$RUNNER_TEMP/daily.keystore"

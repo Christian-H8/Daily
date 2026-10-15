@@ -3,6 +3,20 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+// Release identity comes from the git tag in CI: tag v1.2.3 sets DAILY_VERSION=1.2.3,
+// which becomes versionName "1.2.3" and versionCode 10203. Local builds keep 1.0 / 1.
+// Android refuses to install a lower versionCode over a higher one, so the code must
+// only ever rise; deriving it from the tag makes that a property of the tag rather
+// than of anyone remembering to bump it.
+val releaseVersion: String? = System.getenv("DAILY_VERSION")?.takeIf { it.isNotBlank() }
+val releaseVersionCode: Int? = releaseVersion?.let { v ->
+    val parts = v.split(".").map { it.toIntOrNull() }
+    require(parts.size == 3 && parts.all { it != null && it >= 0 } && parts[1]!! < 100 && parts[2]!! < 100) {
+        "DAILY_VERSION must be MAJOR.MINOR.PATCH with MINOR and PATCH under 100, got '$v'"
+    }
+    parts[0]!! * 10_000 + parts[1]!! * 100 + parts[2]!!
+}
+
 android {
     namespace = "com.christianh.daily"
     compileSdk {
@@ -13,10 +27,25 @@ android {
         applicationId = "com.christianh.daily"
         minSdk = 31
         targetSdk = 37
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = releaseVersionCode ?: 1
+        versionName = releaseVersion ?: "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    signingConfigs {
+        // CI signs with a keystore decoded from GitHub Actions secrets
+        // (.github/workflows/release.yml). The variables are absent in every local
+        // build, so this config only exists on the runner.
+        val keystore = System.getenv("DAILY_KEYSTORE_FILE")
+        if (!keystore.isNullOrBlank()) {
+            create("release") {
+                storeFile = file(keystore)
+                storePassword = System.getenv("DAILY_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("DAILY_KEY_ALIAS")
+                keyPassword = System.getenv("DAILY_KEY_PASSWORD")
+            }
+        }
     }
 
     buildTypes {
@@ -24,15 +53,18 @@ android {
             optimization {
                 enable = false
             }
-            // Signed with the auto-generated debug keystore (~/.android/debug.keystore).
-            // Android refuses to install an unsigned APK, and this app is sideloaded to
-            // one phone — a real keystore would mean generating one, storing a password
-            // outside git, and guarding it, all to protect an app only its author installs.
+            // Signed with the author's Android Studio debug keystore (~/.android/debug.keystore):
+            // locally through the debug config, in CI through "release" above, which is the
+            // same keystore stored as a secret. Same key both ways is the point: the GitHub
+            // Release APK installs as an update over the copy already on the author's phone.
             //
-            // The cost, worth knowing before the soak install becomes the one kept:
-            // Android will not upgrade an app across a signature change, so switching to
-            // a real key later requires an uninstall — which takes notes.json with it.
-            signingConfig = signingConfigs.getByName("debug")
+            // Why not a dedicated release key: Android will not upgrade an app across a
+            // signature change, so switching keys the naive way means an uninstall, and an
+            // uninstall deletes notes.json (no export exists, and a release build cannot be
+            // read back over adb). The way out that keeps the notes is APK Signature Scheme
+            // v3 key rotation (apksigner rotate, then sign with --lineage): the new key proves
+            // the old one authorised it. minSdk 31 is above rotation's floor of API 28.
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
         // A separate package for development, so the four-day soak test can run on
         // an untouched release install while work continues (DECISIONS D-012: every

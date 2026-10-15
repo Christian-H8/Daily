@@ -14,3 +14,26 @@
 .cxx
 local.properties
 .kotlin
+
+# --- Public-repo hardening (2026-10-10) ---
+# Signing material. The release keystore lives only in GitHub Actions secrets
+# and on the author's machine; nothing that can sign this app is ever committed.
+*.jks
+*.keystore
+*.p12
+*.pem
+keystore.properties
+signing.properties
+.env
+.env.*
+
+# Build outputs. APKs are published as GitHub Release assets, not committed.
+*.apk
+*.aab
+*.apks
+/app/release/
+/app/debug/
+output-metadata.json
+
+# Heap dumps and crash captures can contain app memory, notes included.
+*.hprof

@@ -1,0 +1,18 @@
+# Normalise line endings in the repository to LF whatever the committer's Git
+# config says. HEAD was already all-LF; this makes it a property of the repo
+# rather than of one machine's core.autocrlf.
+* text=auto
+
+# Executed on Linux CI runners: must stay LF or the shebang breaks.
+gradlew text eol=lf
+*.sh    text eol=lf
+
+# Windows batch files need CRLF.
+*.bat   text eol=crlf
+
+# Binary, never touched.
+*.jar   binary
+*.webp  binary
+*.png   binary
+*.jks   binary
+*.keystore binary
