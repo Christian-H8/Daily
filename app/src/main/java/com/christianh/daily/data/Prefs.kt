@@ -1,7 +1,7 @@
 package com.christianh.daily.data
 
 import android.content.Context
-import com.christianh.daily.Domain.model.Condition
+import com.christianh.daily.domain.model.Condition
 
 /**
  * Settings. Shares the "daily" preferences file with [CorpusSource], which owns the
@@ -15,6 +15,7 @@ object Prefs {
     private const val KEY_HOUR = "notify_hour"
     private const val KEY_MINUTE = "notify_minute"
     private const val KEY_FORECAST = "forecast_override"
+    private const val KEY_FLICK = "flick_navigation"
 
     const val DEFAULT_HOUR = 8
     const val DEFAULT_MINUTE = 0
@@ -29,6 +30,18 @@ object Prefs {
             .putInt(KEY_HOUR, hour.coerceIn(0, 23))
             .putInt(KEY_MINUTE, minute.coerceIn(0, 59))
             .apply()
+    }
+
+    /**
+     * Rotate-flick navigation. **Off by default**: it is a gesture nobody arrives
+     * expecting, and one that fires on motion rather than on touch, so a first run
+     * that navigates on its own would read as the app being broken rather than as a
+     * feature waiting to be found.
+     */
+    fun flickNavigation(context: Context): Boolean = p(context).getBoolean(KEY_FLICK, false)
+
+    fun setFlickNavigation(context: Context, enabled: Boolean) {
+        p(context).edit().putBoolean(KEY_FLICK, enabled).apply()
     }
 
     /** null means "use the forecast file" (SRS [R9.2d] — forecasts are wrong often enough). */

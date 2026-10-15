@@ -1,7 +1,7 @@
 package com.christianh.daily.data
 
 import android.content.Context
-import com.christianh.daily.Domain.model.Note
+import com.christianh.daily.domain.model.Note
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -24,7 +24,10 @@ import java.time.LocalDate
  * processing in every build. That is exactly the recurring upgrade obligation the
  * longevity pillar exists to refuse.
  *
- * And it makes [R8.1] free — the store *is* the plain, human-readable export.
+ * The format is the plain, human-readable one [R8.1] asks for. The location is not:
+ * app-private storage is invisible to any sync client, so this file alone was never
+ * the export D-020 took it for. [NoteBackup] writes the same JSON into the chosen
+ * folder (D-028).
  *
  * `NoteRepository` is the boundary, so swapping this for Room later touches one
  * file. That is the ports-and-adapters argument actually being cashed in.

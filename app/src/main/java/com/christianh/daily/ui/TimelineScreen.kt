@@ -26,10 +26,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.christianh.daily.Domain.Day
-import com.christianh.daily.Domain.EPOCH
-import com.christianh.daily.Domain.Timeline
-import com.christianh.daily.Domain.model.Entry
+import com.christianh.daily.domain.Day
+import com.christianh.daily.domain.Timeline
+import com.christianh.daily.domain.model.Entry
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
@@ -39,13 +38,20 @@ private val MONTH_FMT: DateTimeFormatter = DateTimeFormatter.ofPattern("MMMM yyy
 /** A flat list so the LazyColumn needs no sticky-header API. */
 private sealed interface RowItem {
     data class MonthHeader(val label: String) : RowItem
+    data class Marker(val label: String) : RowItem
     data class DayRow(val day: Day) : RowItem
 }
 
-private fun rowsFor(days: List<Day>): List<RowItem> {
+private fun rowsFor(days: List<Day>, passStart: LocalDate): List<RowItem> {
     val out = ArrayList<RowItem>(days.size + 12)
     var month = ""
+    var markedEarlier = false
     for (d in days) {
+        if (!markedEarlier && d.date.isBefore(passStart)) {
+            out += RowItem.Marker("EARLIER — DAYS YOU WROTE ON")
+            markedEarlier = true
+            month = ""            // force the month header to reprint after the break
+        }
         val label = d.date.format(MONTH_FMT)
         if (label != month) {
             out += RowItem.MonthHeader(label)
@@ -60,6 +66,10 @@ private fun rowsFor(days: List<Day>): List<RowItem> {
  * The library: a scrollable timeline, newest first, one row per day, plus tag
  * filtering. Nothing else — D-016 rules out search and related-edge traversal,
  * because the vault is the graph and duplicating Obsidian badly is not the job.
+ *
+ * **The range is one full pass, not all of history.** Running back to EPOCH gave
+ * 255 rows over a 27-entry corpus, so every title appeared about nine times — the
+ * rotation working correctly and reading as a bug. See [Timeline.view].
  */
 @Composable
 fun TimelineScreen(
@@ -71,9 +81,13 @@ fun TimelineScreen(
     var tag by remember { mutableStateOf<String?>(null) }
 
     val allTags = remember(corpus) { Timeline.tagsOf(corpus) }
-    val days = remember(corpus, today) { Timeline.days(today, EPOCH, corpus) }
-    val rows = remember(days, tag) {
-        rowsFor(if (tag == null) days else days.filter { tag in it.entry.tags })
+    val noted = notes.keys
+    val days = remember(corpus, today, noted) { Timeline.view(today, corpus, noted) }
+    val passStart = remember(corpus.size, today) {
+        today.minusDays((corpus.size - 1).coerceAtLeast(0).toLong())
+    }
+    val rows = remember(days, tag, passStart) {
+        rowsFor(if (tag == null) days else days.filter { tag in it.entry.tags }, passStart)
     }
 
     Column(Modifier.fillMaxSize()) {
@@ -83,6 +97,7 @@ fun TimelineScreen(
             items(rows) { row ->
                 when (row) {
                     is RowItem.MonthHeader -> MonthHeaderView(row.label)
+                    is RowItem.Marker -> MarkerView(row.label)
                     is RowItem.DayRow -> DayRowView(row.day, notes[row.day.date], onOpen)
                 }
             }
@@ -123,6 +138,25 @@ private fun MonthHeaderView(label: String) {
         modifier = Modifier.padding(horizontal = 24.dp)
     )
     Spacer(Modifier.height(8.dp))
+}
+
+/**
+ * The seam between this pass and older days. Everything below it survived only
+ * because something was written against it — which is also the only thing that
+ * makes an old row trustworthy, since the permutation shifts as the corpus grows.
+ */
+@Composable
+private fun MarkerView(label: String) {
+    Spacer(Modifier.height(36.dp))
+    HorizontalDivider(Modifier.padding(horizontal = 24.dp))
+    Spacer(Modifier.height(10.dp))
+    Text(
+        label,
+        style = MaterialTheme.typography.labelMedium,
+        letterSpacing = 1.5.sp,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(horizontal = 24.dp)
+    )
 }
 
 /**

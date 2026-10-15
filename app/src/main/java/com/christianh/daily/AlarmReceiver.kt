@@ -10,9 +10,9 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
-import com.christianh.daily.Domain.DailySelector
-import com.christianh.daily.Domain.model.Block
-import com.christianh.daily.Domain.model.Entry
+import com.christianh.daily.domain.DailySelector
+import com.christianh.daily.domain.model.Block
+import com.christianh.daily.domain.model.Entry
 import com.christianh.daily.data.CorpusLoader
 import java.time.LocalDate
 

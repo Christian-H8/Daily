@@ -1,6 +1,6 @@
-package com.christianh.daily.Domain
+package com.christianh.daily.domain
 
-import com.christianh.daily.Domain.model.Entry
+import com.christianh.daily.domain.model.Entry
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 

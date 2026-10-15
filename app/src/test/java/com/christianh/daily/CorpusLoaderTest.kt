@@ -1,6 +1,6 @@
 package com.christianh.daily
 
-import com.christianh.daily.Domain.model.Block
+import com.christianh.daily.domain.model.Block
 import com.christianh.daily.data.CorpusLoader
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull

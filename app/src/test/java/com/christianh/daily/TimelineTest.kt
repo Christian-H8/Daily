@@ -1,9 +1,9 @@
 package com.christianh.daily
 
-import com.christianh.daily.Domain.DailySelector
-import com.christianh.daily.Domain.EPOCH
-import com.christianh.daily.Domain.Timeline
-import com.christianh.daily.Domain.model.Entry
+import com.christianh.daily.domain.DailySelector
+import com.christianh.daily.domain.EPOCH
+import com.christianh.daily.domain.Timeline
+import com.christianh.daily.domain.model.Entry
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -73,6 +73,82 @@ class TimelineTest {
     @Test fun `empty corpus gives an empty timeline`() {
         val days = Timeline.days(LocalDate.of(2026, 9, 12), EPOCH, emptyList())
         assertTrue(days.isEmpty())
+    }
+
+    // --- view(): the range the library actually shows -------------------------
+
+    /** The bug this fixes: 255 rows over 27 entries meant every title nine times. */
+    @Test fun `one pass shows every entry exactly once, with no repeats`() {
+        val today = LocalDate.of(2026, 9, 13)
+        val rows = Timeline.view(today, corpus, emptySet())
+
+        assertEquals(corpus.size, rows.size)
+        assertEquals(corpus.size, rows.map { it.entry.id }.toSet().size)
+    }
+
+    @Test fun `the window is newest first and ends one pass back`() {
+        val today = LocalDate.of(2026, 9, 13)
+        val rows = Timeline.view(today, corpus, emptySet())
+
+        assertEquals(today, rows.first().date)
+        assertEquals(today.minusDays((corpus.size - 1).toLong()), rows.last().date)
+        for (i in 1 until rows.size) {
+            assertTrue(rows[i].date.isBefore(rows[i - 1].date))
+        }
+    }
+
+    /** Older days survive only if something was written against them. */
+    @Test fun `an older day is kept when it carries a note`() {
+        val today = LocalDate.of(2026, 9, 13)
+        val old = LocalDate.of(2026, 6, 1)
+        val rows = Timeline.view(today, corpus, setOf(old))
+
+        assertEquals(corpus.size + 1, rows.size)
+        assertEquals(old, rows.last().date)
+    }
+
+    @Test fun `a noted day already inside the window is not duplicated`() {
+        val today = LocalDate.of(2026, 9, 13)
+        val inside = today.minusDays(2)
+        val rows = Timeline.view(today, corpus, setOf(inside))
+
+        assertEquals(corpus.size, rows.size)
+        assertEquals(1, rows.count { it.date == inside })
+    }
+
+    @Test fun `older noted days are newest first too`() {
+        val today = LocalDate.of(2026, 9, 13)
+        val notes = setOf(
+            LocalDate.of(2026, 6, 1),
+            LocalDate.of(2026, 7, 4),
+            LocalDate.of(2026, 5, 9)
+        )
+        val tail = Timeline.view(today, corpus, notes).takeLast(3).map { it.date }
+        assertEquals(
+            listOf(LocalDate.of(2026, 7, 4), LocalDate.of(2026, 6, 1), LocalDate.of(2026, 5, 9)),
+            tail
+        )
+    }
+
+    /** The library and the daily screen must never disagree about a date. */
+    @Test fun `view agrees with the daily selector on every row`() {
+        val today = LocalDate.of(2026, 9, 13)
+        val notes = setOf(LocalDate.of(2026, 6, 1), LocalDate.of(2026, 7, 4))
+        for (day in Timeline.view(today, corpus, notes)) {
+            assertEquals(DailySelector.entryFor(day.date, corpus)!!.id, day.entry.id)
+        }
+    }
+
+    @Test fun `an empty corpus gives an empty view`() {
+        assertTrue(
+            Timeline.view(LocalDate.of(2026, 9, 13), emptyList(), setOf(LocalDate.of(2026, 6, 1)))
+                .isEmpty()
+        )
+    }
+
+    @Test fun `a single-entry corpus is a single row`() {
+        val one = listOf(entry("only"))
+        assertEquals(1, Timeline.view(LocalDate.of(2026, 9, 13), one, emptySet()).size)
     }
 
     @Test fun `tags are deduplicated and sorted`() {

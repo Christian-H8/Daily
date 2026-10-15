@@ -38,6 +38,20 @@ import kotlin.math.sin
  * The clock is inaccurate on purpose; the *mechanism* is not. Tooth counts mesh,
  * centres sit exactly r1 + r2 apart, and every satellite's angle is derived from
  * one drive value by its real tooth ratio.
+ *
+ * ## A rejected rebuild, and why it is worth recording
+ *
+ * This was once rebuilt as five stacked planes — a translucent movement plate, a
+ * blurred gear behind it, receded satellites, the front gear, and a glass layer
+ * with a specular sweep — chasing more depth. It was worse, and the reason is in
+ * the third sentence of this comment: **the holes are real holes.** Putting a plate
+ * behind the gears filled them in. What had been metal laid over a page became a
+ * picture of a mechanism pasted on top of one, and every other cue added — shadows,
+ * blur, parallax — was paying for a loss it had itself created.
+ *
+ * The transparency is not a limitation this design works around. It *is* the
+ * design. Anything that closes it needs to be worth more than it, and a plate
+ * was not.
  */
 @Composable
 fun DialBand(

@@ -1,19 +1,25 @@
-<?xml version="1.0" encoding="utf-8"?><!--
-   Sample data extraction rules file; uncomment and customize as necessary.
-   See https://developer.android.com/about/versions/12/backup-restore#xml-changes
-   for details.
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 12+ (API 31+) backup rules. minSdk is 31, so this is the only rules file
+  any supported device reads; backup_rules.xml is kept in step for completeness.
+
+  The rule this enforces: nothing written on the phone leaves the phone over the
+  internet. Notes are the only user-generated data, so they are excluded from
+  Google Drive cloud backup. Everything else (preferences: alarm time, chosen
+  folder) is harmless to back up and is left in.
+
+  Device-to-device transfer is a local cable / Wi-Fi Direct copy to a new phone,
+  not a cloud upload, so notes are allowed to travel that way. A phone upgrade
+  should not cost the notes.
+
+  Paths are relative to Context.filesDir — see NoteStore.FILE_NAME.
 -->
 <data-extraction-rules>
     <cloud-backup>
-        <!-- TODO: Use <include> and <exclude> to control what is backed up.
-        <include .../>
-        <exclude .../>
-        -->
+        <exclude domain="file" path="notes.json" />
+        <exclude domain="file" path="notes.json.tmp" />
     </cloud-backup>
-    <!--
     <device-transfer>
-        <include .../>
-        <exclude .../>
+        <exclude domain="file" path="notes.json.tmp" />
     </device-transfer>
-    -->
 </data-extraction-rules>

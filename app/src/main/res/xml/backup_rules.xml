@@ -1,13 +1,11 @@
-<?xml version="1.0" encoding="utf-8"?><!--
-   Sample backup rules file; uncomment and customize as necessary.
-   See https://developer.android.com/guide/topics/data/autobackup
-   for details.
-   Note: This file is ignored for devices older than API 31
-   See https://developer.android.com/about/versions/12/backup-restore
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Pre-Android 12 Auto Backup rules (android:fullBackupContent). Ignored on API 31+,
+  and minSdk is 31, so no supported device reads this file. Kept in step with
+  data_extraction_rules.xml so lowering minSdk can never silently re-enable
+  cloud backup of notes.
 -->
 <full-backup-content>
-    <!--
-   <include domain="sharedpref" path="."/>
-   <exclude domain="sharedpref" path="device.xml"/>
--->
+    <exclude domain="file" path="notes.json" />
+    <exclude domain="file" path="notes.json.tmp" />
 </full-backup-content>

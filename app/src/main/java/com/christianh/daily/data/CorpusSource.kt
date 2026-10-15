@@ -6,9 +6,9 @@ import android.net.Uri
 import android.provider.DocumentsContract
 
 /**
- * Where corpus.json comes from.
+ * Where corpus.json comes from, and the folder the notes backup writes into (D-028).
  *
- * Preferred: a folder the user picked once, which Autosync keeps in step with the
+ * Preferred: a folder the user picked once, which a folder-sync app keeps in step with the
  * desktop vault. That is what makes adding an entry a sync rather than a rebuild —
  * and a rebuild means a reinstall, which wipes the battery exemption (D-012).
  *
@@ -24,11 +24,23 @@ object CorpusSource {
     private const val KEY_TREE = "corpus_tree_uri"
     const val FILE_NAME = "corpus.json"
 
+    /**
+     * Persists **read and write** (D-028). Read was all the corpus needed, and it was
+     * all that was ever persisted, which is why an install that chose its folder
+     * before the notes backup existed must choose it again before the backup can
+     * write ([BackupStatus.ReadOnly]). A provider that grants only read makes the
+     * combined call throw, so it falls back to read alone; persisting nothing
+     * would also lose the corpus.
+     */
     fun saveTree(context: Context, uri: Uri) {
+        val resolver = context.contentResolver
         runCatching {
-            context.contentResolver.takePersistableUriPermission(
-                uri, Intent.FLAG_GRANT_READ_URI_PERMISSION
+            resolver.takePersistableUriPermission(
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
             )
+        }.recoverCatching {
+            resolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit().putString(KEY_TREE, uri.toString()).apply()
@@ -52,16 +64,23 @@ object CorpusSource {
      */
     fun siblingJson(context: Context, name: String): String? = runCatching {
         val tree = treeUri(context) ?: return null
-        val doc = findChild(context, tree, name) ?: return null
+        val doc = child(context, tree, name) ?: return null
         context.contentResolver.openInputStream(doc)
             ?.bufferedReader()
             ?.use { it.readText() }
     }.getOrNull()
 
+    /** Whether a persisted grant lets the app write into [tree]. */
+    fun canWrite(context: Context, tree: Uri): Boolean =
+        context.contentResolver.persistedUriPermissions.any {
+            it.uri == tree && it.isWritePermission
+        }
+
     fun assetJson(context: Context): String =
         context.assets.open(FILE_NAME).bufferedReader().use { it.readText() }
 
-    private fun findChild(context: Context, tree: Uri, name: String): Uri? {
+    /** A file in the chosen folder by display name, or null. [NoteBackup] writes through it. */
+    internal fun child(context: Context, tree: Uri, name: String): Uri? {
         val children = DocumentsContract.buildChildDocumentsUriUsingTree(
             tree, DocumentsContract.getTreeDocumentId(tree)
         )

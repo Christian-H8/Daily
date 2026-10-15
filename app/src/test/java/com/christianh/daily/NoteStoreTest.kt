@@ -1,6 +1,6 @@
 package com.christianh.daily
 
-import com.christianh.daily.Domain.model.Note
+import com.christianh.daily.domain.model.Note
 import com.christianh.daily.data.NoteStore
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue

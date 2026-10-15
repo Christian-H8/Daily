@@ -1,4 +1,4 @@
-package com.christianh.daily.Domain.model
+package com.christianh.daily.domain.model
 
 import java.time.LocalDate
 

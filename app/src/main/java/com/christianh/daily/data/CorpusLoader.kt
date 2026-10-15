@@ -1,9 +1,9 @@
 package com.christianh.daily.data
 
 import android.content.Context
-import com.christianh.daily.Domain.model.Block
-import com.christianh.daily.Domain.model.Entry
-import com.christianh.daily.Domain.model.Section
+import com.christianh.daily.domain.model.Block
+import com.christianh.daily.domain.model.Entry
+import com.christianh.daily.domain.model.Section
 import org.json.JSONArray
 import org.json.JSONObject
 

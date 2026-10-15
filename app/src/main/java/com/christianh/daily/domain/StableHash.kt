@@ -1,4 +1,4 @@
-package com.christianh.daily.Domain
+package com.christianh.daily.domain
 
 /**
  * FNV-1a, 64-bit. Specified rather than borrowed, because publish.py must

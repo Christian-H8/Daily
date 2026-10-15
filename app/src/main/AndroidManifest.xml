@@ -4,6 +4,15 @@
 
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <!--
+      Not required: a device without a gyroscope keeps the swipe and simply never
+      sees the flick. Marking it required would block installation over an input
+      that has an equivalent sitting next to it.
+    -->
+    <uses-feature
+        android:name="android.hardware.sensor.gyroscope"
+        android:required="false" />
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -17,6 +26,7 @@
             android:name=".MainActivity"
             android:exported="true"
             android:label="@string/app_name"
+            android:screenOrientation="portrait"
             android:theme="@style/Theme.Daily"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>

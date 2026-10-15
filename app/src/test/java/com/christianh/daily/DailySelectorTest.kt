@@ -1,9 +1,9 @@
 package com.christianh.daily
 
-import com.christianh.daily.Domain.DailySelector
-import com.christianh.daily.Domain.EPOCH
-import com.christianh.daily.Domain.StableHash
-import com.christianh.daily.Domain.model.Entry
+import com.christianh.daily.domain.DailySelector
+import com.christianh.daily.domain.EPOCH
+import com.christianh.daily.domain.StableHash
+import com.christianh.daily.domain.model.Entry
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
